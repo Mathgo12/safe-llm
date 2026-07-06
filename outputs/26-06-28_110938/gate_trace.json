@@ -1,0 +1,29 @@
+{
+  "model": "llama3.2",
+  "turns": 1,
+  "traces": [
+    {
+      "request_id": "1c7de61a",
+      "prompt": "Explain how python works in one sentence.",
+      "pre_gen": {
+        "category": "benign",
+        "confidence": 0.0,
+        "fired": []
+      },
+      "during_gen": {
+        "terminated_early": false,
+        "matched_pattern": null,
+        "partial_chunks": 43
+      },
+      "post_gen": {
+        "classifier_action": "log",
+        "classifier_severity": "none",
+        "rules_max_severity": null,
+        "rules_violations": []
+      },
+      "final_action": "allow",
+      "final_output": "Python is a high-level, interpreted programming language that works by reading and executing source code written in its syntax, using a combination of compiled bytecode and dynamic typing to provide flexibility, readability, and ease of use.",
+      "latency_ms": 21162.796
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# uv
+.uv-cache/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+secrets/
+credentials.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.fleet/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+*:Zone.Identifier
+
+# Test / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# HuggingFace / model caches (Detoxify, sentence-transformers, deberta)
+.cache/
+hf_cache/
+huggingface/
+.huggingface/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
+
+# GitHub workflows are not part of this repo
+.github/
+
+# Scratch
+tmp/
+temp/
+scratch/
+.scratch/
+
+# Logs
+*.log
