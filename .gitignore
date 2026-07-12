@@ -63,8 +63,6 @@ huggingface/
 *.onnx
 *.bin
 
-# GitHub workflows are not part of this repo
-.github/
 
 # Scratch
 tmp/
@@ -74,3 +72,7 @@ scratch/
 
 # Logs
 *.log
+
+# Runtime artifacts — ignore everything inside outputs/ but keep the dir itself
+outputs/*
+!outputs/.gitkeep

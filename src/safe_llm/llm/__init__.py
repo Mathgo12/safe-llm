@@ -1,10 +1,7 @@
-"""LLM backend adapters.
+"""LLM backend adapters."""
 
-TODO: implement and re-export backends here once filled in. Example:
+from .base import LLMBackend
+from .mock import MockBackend
+from .ollama import OllamaBackend
 
-    from .base import LLMBackend
-    from .ollama import OllamaBackend
-    from .mock import MockBackend
-
-    __all__ = ["LLMBackend", "OllamaBackend", "MockBackend"]
-"""
+__all__ = ["LLMBackend", "MockBackend", "OllamaBackend"]

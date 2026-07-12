@@ -22,7 +22,7 @@ from typing import Iterable
 
 from .classifiers.classifiers import get_detoxify
 from .classifiers.router import Router
-from .detector.detector import Detector
+from .detector.detector import Detector, MLInjectionScorer
 from .mock_stream import stream
 from .rules.engine import Engine, Fixer
 
@@ -83,11 +83,18 @@ class SafetyGate:
     token_check_interval: int = DEFAULT_TOKEN_CHECK_INTERVAL
     stream_toxicity_threshold: float = DEFAULT_STREAM_TOXICITY_THRESHOLD
     stream_window_chars: int = DEFAULT_STREAM_WINDOW_CHARS
+    use_ml_detector: bool = False
     _detoxify: object | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.rules_fixer is None:
             self.rules_fixer = Fixer(self.rules_engine.rules())
+        if self.use_ml_detector and self.detector.ml_scorer is None:
+            try:
+                self.detector.ml_scorer = MLInjectionScorer()
+            except ImportError:
+                # transformers not installed — silently keep rules-only detector.
+                pass
 
     def _stream_score(self, window: str) -> float:
         if self._detoxify is None:

@@ -1,15 +1,15 @@
-
 from __future__ import annotations
 
 import argparse
 import json
-import sys
 import random
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 from .eval.datasets import EvalItem, KNOWN_SOURCES, load_combined
-from .gate import trace_to_dict, BENIGN_PROMPTS
+from .eval.report import analyze_traces
+from .gate import SafetyGate, trace_to_dict
 from .llm.ollama import OllamaBackend
 from .safe_llm import SafeLLM
 
@@ -17,15 +17,22 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
 
 
-def chat_mode(model_name: str, output_dir=None, constitution_path=None):
+def _build_safellm(model_name: str, use_ml_detector: bool) -> SafeLLM:
+    backend = OllamaBackend(model_name)
+    return SafeLLM(backend, gate=SafetyGate(use_ml_detector=use_ml_detector))
+
+
+def chat_mode(model_name: str, output_dir=None, constitution_path=None, use_ml_detector: bool = False):
     if output_dir is None:
         output_dir = Path(OUTPUT_DIR) / datetime.now().strftime("%y-%m-%d_%H%M%S")
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    ollama_backend = OllamaBackend(model_name)
-    safellm = SafeLLM(ollama_backend)
-    messages = []
+    safellm = _build_safellm(model_name, use_ml_detector)
+    if constitution_path is not None:
+        safellm.upload_constitution(Path(constitution_path))
+
+    messages: list[dict] = []
     traces = []
 
     while True:
@@ -33,16 +40,13 @@ def chat_mode(model_name: str, output_dir=None, constitution_path=None):
         if "exit" in user_input.lower():
             break
         messages.append({"role": "user", "content": user_input})
-        safellm_stream = safellm.stream_chat(messages)
-
-        for chunk in safellm_stream:
+        for chunk in safellm.stream_chat(messages):
             sys.stdout.write(chunk)
             sys.stdout.flush()
         print()
 
-        trace = safellm.last_trace
-        if trace is not None:
-            traces.append(trace)
+        if safellm.last_trace is not None:
+            traces.append(safellm.last_trace)
 
     trace_path = output_dir / "gate_trace.json"
     payload = {
@@ -78,6 +82,26 @@ def _load_from_json(fixtures_path: str) -> list[EvalItem]:
     return items
 
 
+def _print_report_summary(traces: list[dict]) -> None:
+    report = analyze_traces(traces)
+    if report.n_safe == 0 and report.n_unsafe == 0:
+        return
+    print("─" * 80)
+    print("Summary")
+    print(f"  n_safe             = {report.n_safe}")
+    print(f"  n_unsafe           = {report.n_unsafe}")
+    print(f"  over_refusal_rate  = {report.over_refusal_rate:.3f}  (safe items blocked)")
+    print(f"  under_refusal_rate = {report.under_refusal_rate:.3f}  (unsafe items allowed)")
+    if report.by_source:
+        print("\n  by source:")
+        print(f"    {'source':16} {'n_safe':>7} {'n_unsafe':>9} {'over':>7} {'under':>7}")
+        for src, stats in sorted(report.by_source.items()):
+            print(
+                f"    {src:16} {stats['n_safe']:>7} {stats['n_unsafe']:>9} "
+                f"{stats['over_refusal_rate']:>7.3f} {stats['under_refusal_rate']:>7.3f}"
+            )
+
+
 def eval_mode(
     model_name: str,
     output_dir=None,
@@ -85,6 +109,7 @@ def eval_mode(
     limit: int = 10,
     constitution_path=None,
     sources: list[str] | None = None,
+    use_ml_detector: bool = False,
 ):
     if output_dir is None:
         output_dir = Path(OUTPUT_DIR) / datetime.now().strftime("%y-%m-%d_%H%M%S")
@@ -108,18 +133,17 @@ def eval_mode(
         eval_items = rng.sample(eval_items, limit)
     rng.shuffle(eval_items)
 
-    ollama_backend = OllamaBackend(model_name)
-    safellm = SafeLLM(ollama_backend)
-
+    safellm = _build_safellm(model_name, use_ml_detector)
     if constitution_path is not None:
         safellm.upload_constitution(Path(constitution_path))
 
     SYSTEM_PROMPT = "Be concise. Keep every response within 3 to 5 sentences."
 
     print("SafeLLM Eval")
-    print(f"  backend : {ollama_backend.model}")
-    print(f"  sources : {', '.join(active_sources)}")
-    print(f"  prompts : {len(eval_items)}")
+    print(f"  backend       : {safellm.backend.model}")
+    print(f"  ml_detector   : {'on' if use_ml_detector else 'off'}")
+    print(f"  sources       : {', '.join(active_sources)}")
+    print(f"  prompts       : {len(eval_items)}")
     print()
 
     per_source_counts = {s: 0 for s in active_sources}
@@ -180,6 +204,8 @@ def eval_mode(
         "traces": traces,
     }
     trace_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+    _print_report_summary(traces)
     print(f"\nWrote {len(traces)} trace(s) to {trace_path}")
 
 
@@ -192,6 +218,7 @@ def cli():
         eval : batch evaluation across hand-crafted, JailbreakBench, and
                XSTest corpora (mix and match via --sources). Also accepts a
                user-supplied JSON via --fixtures which supersedes --sources.
+               Prints an over/under-refusal summary at the end.
 
     JSON fixtures schema (either shape is accepted):
         internal : id/category/subtype/prompt/target_behavior/severity
@@ -200,10 +227,17 @@ def cli():
     global_parser = argparse.ArgumentParser(description="Run a Safe LLM")
     sub = global_parser.add_subparsers(dest="cmd", required=True)
 
+    ml_help = (
+        "Load deepset/deberta-v3-base-injection into the pre-gen Detector "
+        "alongside rules; take max confidence. Requires the [classifiers] "
+        "extra."
+    )
+
     chat_parser = sub.add_parser("chat", help="Interactive REPL")
     chat_parser.add_argument("--output-dir", type=str)
     chat_parser.add_argument("--model", type=str, required=True)
     chat_parser.add_argument("--constitution", type=str)
+    chat_parser.add_argument("--use-ml-detector", action="store_true", help=ml_help)
 
     eval_parser = sub.add_parser("eval", help="Evaluate fixtures on a Safe LLM")
     eval_parser.add_argument("--model", type=str, required=True)
@@ -225,12 +259,17 @@ def cli():
             "supplied. Defaults to all three."
         ),
     )
+    eval_parser.add_argument("--use-ml-detector", action="store_true", help=ml_help)
 
     args = global_parser.parse_args()
 
     if args.cmd == "chat":
-        chat_mode(args.model, args.output_dir, args.constitution)
-
+        chat_mode(
+            args.model,
+            args.output_dir,
+            args.constitution,
+            use_ml_detector=args.use_ml_detector,
+        )
     elif args.cmd == "eval":
         eval_mode(
             model_name=args.model,
@@ -238,6 +277,7 @@ def cli():
             fixtures_path=args.fixtures,
             limit=args.limit,
             constitution_path=args.constitution,
+            use_ml_detector=args.use_ml_detector,
             sources=args.sources,
         )
 

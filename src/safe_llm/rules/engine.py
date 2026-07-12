@@ -26,6 +26,22 @@ DEFAULT_RULES_PATH = HERE / "data" / "constitution.yml"
 
 SEVERITY_ORDER = ("low", "medium", "high")
 
+_REQUIRED_RULE_FIELDS = ("name", "severity", "must", "explanation")
+
+
+def _validate_rules(rules: list[dict[str, Any]]) -> None:
+    for r in rules:
+        if r.get("severity") not in SEVERITY_ORDER:
+            raise ValueError(
+                f"rule {r.get('name')} has bad severity {r.get('severity')!r} "
+                f"(expected one of {SEVERITY_ORDER})"
+            )
+        missing = [f for f in _REQUIRED_RULE_FIELDS if f not in r]
+        if missing:
+            raise ValueError(
+                f"rule {r.get('name')} missing required field(s): {missing}"
+            )
+
 
 @dataclass
 class Violation:
@@ -125,6 +141,7 @@ def _eval_predicate(node: dict[str, Any] | None, text: str) -> tuple[bool, str |
 class Engine:
     def __init__(self, rules: list[dict[str, Any]] | None = None, path: Path | None = None) -> None:
         if rules is not None:
+            _validate_rules(rules)
             self._rules = rules
         elif path is not None:
             self.rules_from_yaml(path)
@@ -135,14 +152,8 @@ class Engine:
         data = load_yaml(rules_yaml.read_text())
         if not isinstance(data, dict) or "rules" not in data:
             raise ValueError("constitution must be a mapping with a 'rules' key")
-
-        for r in data['rules']:
-            if r.get("severity") not in SEVERITY_ORDER:
-                raise ValueError(f"rule {r.get('name')} has bad severity {r.get('severity')}")
-            if "name" not in r or "explanation" not in r or "must" not in r:
-                raise ValueError(f"rule {r.get('name')} missing required field")
-
-        self._rules = data['rules']
+        _validate_rules(data["rules"])
+        self._rules = data["rules"]
 
     def rules(self) -> list[dict[str, Any]]:
         return list(self._rules)
