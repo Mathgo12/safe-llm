@@ -9,9 +9,8 @@ Reference: https://github.com/ollama/ollama/blob/main/docs/api.md
 """
 
 from __future__ import annotations
+from collections.abc import Iterator
 from typing import List
-from .base import LLMBackend
-import ollama
 from ollama import Client
 
 class OllamaBackend:

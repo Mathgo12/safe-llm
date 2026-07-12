@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .benign import prompts as load_benign
-from .rules import REGEX_RULES, SUBSTRING_RULES, all_rules
+from .rules import all_rules
 
 OUTPUTS = Path.cwd() / "outputs"
 

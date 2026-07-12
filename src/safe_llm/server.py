@@ -27,7 +27,6 @@ import json
 import os
 import time
 import uuid
-from dataclasses import asdict
 from typing import Any, Iterator
 
 from .gate import trace_to_dict

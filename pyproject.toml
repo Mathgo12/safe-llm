@@ -16,11 +16,7 @@ dependencies = [
 license = "MIT"
 
 [project.optional-dependencies]
-ollama = ["requests>=2.32"]
 server = ["fastapi>=0.115", "uvicorn>=0.32"]
-yaml = ["pyyaml>=6.0"]
-cli = ["click>=8.1"]
-dev = ["pytest>=8.0"]
 classifiers = [
     "detoxify>=0.5.2",
     "sentence-transformers>=3.0",
@@ -37,7 +33,7 @@ eval = [
     "datasets>=2.14",
 ]
 all = [
-    "safe-llm[ollama,server,yaml,cli,classifiers,pii,eval]",
+    "safe-llm[server,classifiers,pii,eval]",
 ]
 
 [project.scripts]

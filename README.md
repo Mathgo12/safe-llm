@@ -40,7 +40,7 @@ uv sync --extra classifiers --extra pii --extra eval
 
 Extras: `classifiers` (Detoxify, sentence-transformers, transformers, torch,
 nltk — ~1 GB of weights on first use), `pii` (Presidio + spaCy), `eval`
-(HuggingFace `datasets`), `cli`, `server`, `yaml`, `all`.
+(HuggingFace `datasets`), `server` (FastAPI + Uvicorn), `all`.
 
 Plain pip works too:
 
